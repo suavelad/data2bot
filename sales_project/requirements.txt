@@ -1,9 +1,9 @@
 asgiref==3.4.1
 attrs==22.1.0
-Django==3.2.15
-django-cors-headers==3.10.1
-djangorestframework==3.13.1
-djangorestframework-simplejwt==4.4.0
+Django
+django-cors-headers
+djangorestframework
+djangorestframework-simplejwt
 drf-spectacular==0.24.0
 gunicorn==20.1.0
 importlib-metadata==4.8.3

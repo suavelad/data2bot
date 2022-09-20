@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-w$4e1!l^ymk05x#_zu4&1n6paz53pgc6(kem@&)q^%792=xs%%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'auth',
+    'authentication',
     'app',
 
 ]
@@ -140,8 +140,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_HEADERS = ('*')
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=config('ACCESS_TOKEN_LIFETIME',cast=int)),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=config('REFRESH_TOKEN_LIFETIME',cast=int)),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=3600),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
 # Static files (CSS, JavaScript, Images)
@@ -155,7 +155,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
-AUTH_USER_MODEL = "auth.User"
+AUTH_USER_MODEL = "authentication.User"
 
 
 # Default primary key field type
