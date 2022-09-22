@@ -5,13 +5,15 @@ from django.contrib.auth.models import AbstractUser
 
 class User(AbstractUser):
     SEX = (
-        ('Male', 'Male'),
-        ('Female', 'Female')
+        ('m', 'Male'),
+        ('f', 'Female')
     )
     username = models.CharField(max_length=250, unique=True)
     email = models.EmailField(max_length=250, unique=True)
+    is_deleted = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False, blank=True, null=True)
     is_active = models.BooleanField(default=False, blank=True)
+    is_verified = models.BooleanField(default=False, blank=True)
     sex = models.CharField(max_length=7, choices=SEX, null=True, blank=True)
     phone = models.CharField(max_length=15, null=True, blank=True)
     address = models.TextField(blank=True, null=True)

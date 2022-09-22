@@ -1,4 +1,3 @@
-from operator import mod
 from django.db import models
 from authentication.models import User
 
@@ -10,6 +9,7 @@ class Products(models.Model):
     sku = models.TextField(max_length=255,null=True,blank=True)
     name = models.TextField(null=True,blank=True)
     description = models.TextField(null=True,blank=True)
+    is_deleted=models.BooleanField(default=False)
     product_status = models.BooleanField(default=False)
     product_left = models.IntegerField( )
     price = models.FloatField(default=0.0)
@@ -28,6 +28,8 @@ class Order_history(models.Model):
     last_modified = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     time_created = models.TimeField(auto_now_add=True, null=True, blank=True)
     date_created = models.DateField(auto_now_add=True, null=True, blank=True)
+
+
 
 
 

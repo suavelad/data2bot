@@ -30,10 +30,8 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ('name')
-        # exclude = ('field1', )
 
-
-      
+   
 class UserRegistrationSerializer(serializers.Serializer):
     
     USER_MODE = (
@@ -57,27 +55,21 @@ class UserRegistrationSerializer(serializers.Serializer):
         
     
     def create(self,validated_data):
-        request = self.context.get('request')
-
+        first_name = validated_data['first_name'] 
+        last_name = validated_data['last_name'] 
         password = validated_data.pop('password') 
-        first_name = validated_data['first_name']  
-        last_name = validated_data['last_name']
-        sex = request.data['sex'] 
         email = validated_data['email'] 
-        address = validated_data['address'] 
-        phone = validated_data['phone']  
-        birth_date = validated_data['birth_date'] 
-        user_mode  = validated_data['user_mode'] 
-       
-
+        user_mode  = validated_data.pop('user_mode')
+        
         is_user_exist = User.objects.filter(email=email).exists()
             
         if not is_user_exist:  
             if user_mode in ['admin','client']  :  
                 validated_data['is_admin'] = True if user_mode == 'admin' else False     
+                validated_data['username']= f'{first_name}_{last_name}'
                 user = User.objects.create(**validated_data)
                 user.set_password(password)    
-                group= Group.objects.get_or_create(name=user_mode)
+                group,_= Group.objects.get_or_create(name=user_mode)
                 user.is_verified=False
                 user.save()
                 user.groups.add(group)
@@ -90,13 +82,10 @@ class UserRegistrationSerializer(serializers.Serializer):
             
         return validated_data
 
-
-    
 class LoginSerializer(serializers.Serializer):
     
     email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True)
-
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)

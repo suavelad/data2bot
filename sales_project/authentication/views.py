@@ -1,5 +1,3 @@
-# Created By  : Sunday Ajayi (http://linkedin.com/in/sunday-ajayi)
-# Created Date: 02/03/2022
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,7 +5,6 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from  rest_framework.viewsets import GenericViewSet
 
-from drf_yasg.utils import swagger_auto_schema
 
 from django.utils.decorators import  method_decorator
 from django.shortcuts import get_object_or_404
@@ -23,33 +20,43 @@ from django.contrib.auth import authenticate, login, logout, get_user_model
 
 from django.conf import settings
 
-from .token import default_token_generator
 from .utils import  generateKey
 import base64,pyotp
 
 from django.core.mail import send_mail
-from rest_framework import mixins
+from rest_framework.viewsets import ModelViewSet
+
+from drf_spectacular.utils import (extend_schema, OpenApiExample)
 
 
 
-
-# class UserViewSet(ModelViewSet):
-class UserViewSet(mixins.ListModelMixin,
-                    mixins.RetrieveModelMixin,GenericViewSet):
+class UserViewSet(ModelViewSet):
     
-    queryset = User.objects.all().order_by('-id')
+    queryset = User.objects.filter(is_deleted=False).order_by('-id')
     serializer_class = UserSerializer
-    # permission_classes= (AllowAny,) #For now, it is open
-
-    #   permission_classes = (permissions.IsAuthenticated,)
-
+    
+    def delete(self, request):
+        user = request.user
+        
+        try:
+            del_user = User.objects.get(id=user.id)
+            del_user.is_deleted = True
+            del_user.is_active = False
+            del_user.save()
+        
+        except:
+            return Response({'code':status.HTTP_400_BAD_REQUEST,
+                                'status':'error',
+                                'message':'User does not exist'},status=status.HTTP_400_BAD_REQUEST)
+                
 
 class CreateUserView(APIView):
     permission_classes= (AllowAny,) #For now, it is open
 
+    @extend_schema(request=UserRegistrationSerializer)
     def post(self, request,*args,**kwargs):
         """
-            Create a MyModel
+            Create a User
             ---
             parameters:
                 - name: file
@@ -60,9 +67,7 @@ class CreateUserView(APIView):
                 - code: 201
                   message: Created
         """
-        
-
-        
+                
         serializer = UserRegistrationSerializer(data=request.data)
 
         if  serializer.is_valid(): 
@@ -73,7 +78,7 @@ class CreateUserView(APIView):
             
             #Send otp to user 
            
-            user_exist = User.objects.filter(email=email, is_active=True).exists()
+            user_exist = User.objects.filter(email=email,is_deleted=False, is_active=True).exists()
             if not user_exist :
                 keygen = generateKey()
                 key = base64.b32encode(keygen.returnValue(email).encode())
@@ -119,7 +124,7 @@ class LoginView(APIView):
     permission_classes=[AllowAny]
     authentication_classes=[]
     
-    @swagger_auto_schema(request_body=LoginSerializer)
+    @extend_schema(request=LoginSerializer)
     def post(self,request):
         
         serializer= LoginSerializer(data=request.data)
@@ -129,71 +134,77 @@ class LoginView(APIView):
             password = serializer.validated_data['password']
             
             try:
-                user= User.objects.get(email=email)
+                user= User.objects.get(is_deleted=False,email=email)
                 refresh = RefreshToken.for_user(user)
             except:
                 return Response({'code':status.HTTP_400_BAD_REQUEST,
                                 'status':'error',
                                 'message':'User does not exist'},status=status.HTTP_400_BAD_REQUEST)
                 
-            
-            if user.is_verified:
-                if user.is_active:
-                        if user.check_password(password):
-                            
-                            
-                            if user.groups.filter(name='user').exists():
-                                the_serializer= UserUpdateSerializer #UserSerializer                                
-                                user_data = the_serializer(user).data
-
-                            
-                            elif user.groups.filter(name='admin').exists():
-                                the_serializer= UserUpdateSerializer #UserSerializer
-                                user_data = the_serializer(user).data
-                               
-
-                            else:
-                                return Response({
-                                    'code':status.HTTP_401_UNAUTHORIZED,
-                                    'status':'error',
-                                    'message':'User is not authorized. Kindly contact your admin'},status=status.HTTP_401_UNAUTHORIZED)
-                        
-    
-                            
-                            return Response({
-                                'code':status.HTTP_200_OK,
-                                'status':'success',
-                                'message':'Login Sucessful',
-                                'user_info':user_data,
-                                'refresh': str(refresh),
-                                'access': str(refresh.access_token),
-                                'access_duration': settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']
-                                },status=status.HTTP_200_OK)
+            if  not user.is_deleted:
+                if  user.is_verified:
+                    if user.is_active:
+                            if user.check_password(password):
                                 
-                        else:
-                            return Response({'code':status.HTTP_401_UNAUTHORIZED,
-                                'status':'error',
-                                'message':'Incorrect Password Inserted'},status=status.HTTP_401_UNAUTHORIZED)
-                                  
-                else:
-                    return Response({'code':status.HTTP_401_UNAUTHORIZED,
+                                
+                                if user.groups.filter(name='client').exists():
+                                    the_serializer= UserUpdateSerializer #UserSerializer                                
+                                    user_data = the_serializer(user).data
+
+                                
+                                elif user.groups.filter(name='admin').exists():
+                                    the_serializer= UserUpdateSerializer #UserSerializer
+                                    user_data = the_serializer(user).data
+                                
+
+                                else:
+                                    return Response({
+                                        'code':status.HTTP_401_UNAUTHORIZED,
+                                        'status':'error',
+                                        'message':'User is not authorized. Kindly contact your admin'},status=status.HTTP_401_UNAUTHORIZED)
+                                   
+                                
+                                return Response({
+                                    'code':status.HTTP_200_OK,
+                                    'status':'success',
+                                    'message':'Login Sucessful',
+                                    'user_info':user_data,
+                                    'refresh': str(refresh),
+                                    'access': str(refresh.access_token),
+                                    'access_duration': settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']
+                                    },status=status.HTTP_200_OK)
+                                    
+                            else:
+                                return Response({'code':status.HTTP_401_UNAUTHORIZED,
+                                    'status':'error',
+                                    'message':'Incorrect Password Inserted'},status=status.HTTP_401_UNAUTHORIZED)
+                                    
+                    else:
+                        return Response({'code':status.HTTP_401_UNAUTHORIZED,
+                            'status':'error',
+                            'message':'User is not active. Kindly contact your admin'},status=status.HTTP_401_UNAUTHORIZED)
+                                
+                else:                   
+                    
+                    return Response({
+                        'code':status.HTTP_406_NOT_ACCEPTABLE,
                         'status':'error',
-                        'message':'User is not active. Kindly contact your admin'},status=status.HTTP_401_UNAUTHORIZED)
-                            
+                        'message':'User not verified.',
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                        'access_duration': settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']},status=status.HTTP_406_NOT_ACCEPTABLE)
             else:                   
-                
-                return Response({
-                    'code':status.HTTP_406_NOT_ACCEPTABLE,
-                    'status':'error',
-                    'message':'User not verified.',
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                    'access_duration': settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']},status=status.HTTP_406_NOT_ACCEPTABLE)
+                    
+                    return Response({
+                        'code':status.HTTP_400_BAD_REQUEST,
+                        'status':'error',
+                        'message':'User not found.',
+                       },status=status.HTTP_400_BAD_REQUEST)
                 
 
 class UpdatePasswordView(APIView):
 
-    @swagger_auto_schema(request_body=ChangePasswordSerializer)
+    @extend_schema(request=ChangePasswordSerializer)
     def put(self, request, *args, **kwargs):
         user = request.user
         serializer = ChangePasswordSerializer(data=request.data)
@@ -223,11 +234,10 @@ class UpdatePasswordView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
         
 
-
 class OTPVerificationView(APIView):
     permission_classes=[AllowAny]
     
-    @swagger_auto_schema(request_body=OTPVerificationSerializer)
+    @extend_schema(request=OTPVerificationSerializer)
     def post(self, request):
         user = request.user
         serializer = OTPVerificationSerializer(data=request.data)
@@ -236,7 +246,7 @@ class OTPVerificationView(APIView):
             email=serializer.validated_data['email']
             
             is_user_exist = User.objects.filter(email=email).exists()
-            if not is_user_exist:
+            if  is_user_exist:
                 user = User.objects.get(email=email)
                 keygen = generateKey()
                 key = base64.b32encode(keygen.returnValue(email).encode())  # Generating Key
@@ -245,12 +255,13 @@ class OTPVerificationView(APIView):
                 if OTP.verify(otp_code):
                     
                     user.is_verified = True
+                    user.is_active = True
                     user.save()
                     login(request, user)
                     refresh = RefreshToken.for_user(user)
                     
    
-                    if user.groups.filter(name='user').exists():
+                    if user.groups.filter(name='client').exists():
                         the_serializer= UserUpdateSerializer #UserSerializer
                         user_data = the_serializer(user).data
                     
@@ -300,17 +311,16 @@ class OTPVerificationView(APIView):
 
 class ResetPasswordEmailView(APIView):
     permission_classes = (AllowAny,)
-    authentication_classes = []
 
+    @extend_schema(request=EmailSerializer)
     def post(self,request):
         serializer = EmailSerializer(data=request.data)
-        token_generator=default_token_generator
         if serializer.is_valid():
             email_address = serializer.data.get("email").lower()
             
-            is_user_exist = User.objects.filter(email=email_address, is_active=True).exists()
+            is_user_exist = User.objects.filter(email=email_address).exists()
             if is_user_exist:
-                user = User.objects.get(email=email_address, is_active=True)
+                user = User.objects.get(email=email_address)
                 refresh = RefreshToken.for_user(user)
                 keygen = generateKey()
                 key = base64.b32encode(keygen.returnValue(email_address).encode())
@@ -321,8 +331,8 @@ class ResetPasswordEmailView(APIView):
                 message = f'Your reset password OTP is {otp_data}. Please note, the otp expires in 5 minutes.'
                 from_email = settings.EMAIL_HOST_USER
                 to_list = [email_address]
-                send_mail(subject, message, from_email, to_list, fail_silently=False)
-                print("Kindly check your mail to reset your password")
+                # send_mail(subject, message, from_email, to_list, fail_silently=False)
+                print("Kindly check your mail to reset your password, otp is :",otp_data)
                 return Response({
                     'code ': status.HTTP_200_OK,
                     'status':'Successful', 
@@ -348,62 +358,9 @@ class ResetPasswordEmailView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConfirmResetTokenView(APIView):
-
-    @swagger_auto_schema(request_body=ConfirmResetTokenSerializer)
-    def post(self, request):
-        serializer = ConfirmResetTokenSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data['email'].lower()
-            token = serializer.validated_data['otp_code']
-
-            is_user_exist = User.objects.filter(email=email).exists()
-            if not is_user_exist:
-                user = User.objects.get(email=email)
-                keygen = generateKey()
-                key = base64.b32encode(keygen.returnValue(email).encode())  # Generating Key
-                OTP = pyotp.TOTP(key, interval=settings.OTP_TIMEOUT)  # TOTP Model
-                print(OTP.verify(token))
-                if OTP.verify(token):
-                    login(request, user)
-                    refresh = RefreshToken.for_user(user)
-                    return Response({
-                        'code':status.HTTP_200_OK,
-                        'status': 'Successful',
-                        'refresh': str(refresh),
-                        'access': str(refresh.access_token),
-                        'message': 'OTP verification successful'
-                    }, status=status.HTTP_200_OK)
-            
-                else:
-                    return Response({
-                        'status': 'failed',
-                        'message': 'OTP verification failed'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return Response({
-                    'status': 'failed',
-                    'message': 'User with the email does not exist'
-                }, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            default_errors = serializer.errors
-            print(default_errors)
-            error_message = ''
-            for field_name, field_errors in default_errors.items():
-                error_message += f'{field_name} is {field_errors[0].code},'
-            # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            return Response({
-                'code': 400,
-                'message': error_message
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-
 class ResetPasswordView(APIView):
-    
-    
-    # permission_classes= (AllowAny,) #For now, it is open
 
-    @swagger_auto_schema(request_body=ResetPasswordSerializer)
+    @extend_schema(request=ResetPasswordSerializer)
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)
         if serializer.is_valid():
@@ -440,12 +397,10 @@ class ResetPasswordView(APIView):
                 'resolve': "Fix error in input"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-           
-                       
+                            
 class GetUserView(APIView):
-    # permission_classes=[AllowAny]
-    # authentication_classes=[]
     
+    @extend_schema(responses = UserUpdateSerializer)
     def get(self,request):
         
         user=request.user
