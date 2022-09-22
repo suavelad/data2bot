@@ -3,9 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from  rest_framework.viewsets import GenericViewSet
-
-
+from rest_framework.viewsets import GenericViewSet
+from django.db.models import Q
 from django.utils.decorators import  method_decorator
 from django.shortcuts import get_object_or_404
 
@@ -147,15 +146,9 @@ class LoginView(APIView):
                             if user.check_password(password):
                                 
                                 
-                                if user.groups.filter(name='client').exists():
+                                if user.groups.filter(Q(name='client')|Q(name='admin')).exists():
                                     the_serializer= UserUpdateSerializer #UserSerializer                                
                                     user_data = the_serializer(user).data
-
-                                
-                                elif user.groups.filter(name='admin').exists():
-                                    the_serializer= UserUpdateSerializer #UserSerializer
-                                    user_data = the_serializer(user).data
-                                
 
                                 else:
                                     return Response({

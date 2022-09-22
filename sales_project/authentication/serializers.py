@@ -70,7 +70,7 @@ class UserRegistrationSerializer(serializers.Serializer):
                 user = User.objects.create(**validated_data)
                 user.set_password(password)    
                 group,_= Group.objects.get_or_create(name=user_mode)
-                user.is_verified=False
+                user.is_verified=True  
                 user.save()
                 user.groups.add(group)
                 
